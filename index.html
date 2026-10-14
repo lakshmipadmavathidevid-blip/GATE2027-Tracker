@@ -12,7 +12,7 @@
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
-/* Priority Badges & Resource Styling */
+/* Priority badges and resource link styling */
 .badge{font-size:.7rem;padding:2px 6px;border-radius:4px;font-weight:700;margin-left:8px;text-transform:uppercase}
 .badge.p-high{background:#e5604f;color:#fff}
 .badge.p-med{background:#f39c12;color:#111}
@@ -92,8 +92,8 @@ dialog{background:#1a1a1a}
   <p class="sub">Syllabus tracker · IIT Madras organizing institute</p>
   <div class="days"><b id="d">--</b><span>days to go</span></div>
   <div class="clock" id="clock">--h --m --s</div>
-  <div class="datebox">Exam date (estimate, change if needed)<input type="date" id="date" aria-label="Exam date"></div>
-  <div class="gauge" role="progressbar" aria-label="Overall progress"><i id="g"></i></div>
+  <div class="datebox">Exam date (estimate; first exam day by default)<input type="date" id="date" aria-label="Exam date"></div>
+  <div class="gauge" id="gauge" role="progressbar" aria-label="Overall progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="g"></i></div>
   <div class="stats">
     <div><b id="pct">0%</b><small>complete</small></div>
     <div><b id="cnt">0/0</b><small>topics done</small></div>
@@ -110,14 +110,14 @@ dialog{background:#1a1a1a}
 <main id="main"></main>
 
 <div class="bar"><button class="danger" id="reset">Erase all progress</button></div>
-<p class="foot">Progress is saved in this browser on this device. No account needed.</p>
+<p class="foot">Progress and links are saved in this browser profile on this device. They are not uploaded by this page. Anyone using the same browser profile may be able to see them.</p>
 </div>
 
 <dialog id="dAttach">
   <h2>Private Notes / Drive Link</h2>
   <p id="attachTitle" style="font-size:.9rem;color:var(--mute)"></p>
-  <p style="font-size:.8rem;color:var(--mute)">Paste your restricted Google Drive link (PDF, Slides, Doc, or Sheet). It is stored strictly in your browser and remains private to your Google account.</p>
-  <input type="url" id="driveUrl" class="dialog-input" placeholder="https://drive.google.com/file/d/..." />
+  <p style="font-size:.8rem;color:var(--mute)">Paste an HTTPS Google Drive or Docs link. The link is saved in this browser profile on this device; access to the file depends on its Google Drive sharing settings.</p>
+  <input type="url" id="driveUrl" class="dialog-input" aria-label="Google Drive or Docs link" autocomplete="url" placeholder="https://drive.google.com/file/d/..." />
   <div class="row">
     <button data-close>Cancel</button>
     <button class="danger" id="delAttach">Remove</button>
@@ -225,12 +225,22 @@ D.forEach((s,si)=>{
   main.append(det);
 });
 
+function safeDriveUrl(value){
+  try{
+    const url=new URL(value);
+    if(url.protocol!=='https:' || !['drive.google.com','docs.google.com'].includes(url.hostname)) return null;
+    return url;
+  }catch(e){return null}
+}
+
 function renderTopicLink(id, container){
   const existing=container.querySelector('.res-link');
   if(existing) existing.remove();
   if(links[id]){
     const a=document.createElement('a');
-    a.href=links[id];
+    const safeUrl=safeDriveUrl(links[id]);
+    if(!safeUrl)return;
+    a.href=safeUrl.href;
     a.target='_blank';
     a.rel='noopener noreferrer';
     a.className='res-link';
@@ -243,11 +253,15 @@ function renderTopicLink(id, container){
 function openAttachModal(id, title){
   activeTopicId=id;
   $('attachTitle').textContent=title;
-  $('driveUrl').value=links[id]\vert{}\vert{}'';$('dAttach').showModal();
+  $('driveUrl').value=links[id] || '';$('dAttach').showModal();
 }
 
 $('saveAttach').onclick=()=>{
-  const url=$('driveUrl').value.trim();
+  const rawUrl=$('driveUrl').value.trim();
+  const parsedUrl=safeDriveUrl(rawUrl);
+  if(rawUrl && !parsedUrl){$('driveUrl').setCustomValidity('Enter an HTTPS link from drive.google.com or docs.google.com.');$('driveUrl').reportValidity();return}
+  $('driveUrl').setCustomValidity('');
+  const url=parsedUrl ? parsedUrl.href : '';
   if(activeTopicId){
     if(url) links[activeTopicId]=url;
     else delete links[activeTopicId];
@@ -273,7 +287,7 @@ function update(){
   const rows=document.querySelectorAll('.t');let c=0;const per=D.map(()=>[0,0]);
   rows.forEach(r=>{const on=r.querySelector('input').checked;r.classList.toggle('done',on);const s=+r.dataset.s;per[s][1]++;if(on){c++;per[s][0]++}});
   const p=Math.round(c/total*100);
-  $('pct').textContent=p+'%';$('cnt').textContent=c+'/'+total;$('g').style.width=p+'%';
+  $('pct').textContent=p+'%';$('cnt').textContent=c+'/'+total;$('g').style.width=p+'%';$('gauge').setAttribute('aria-valuenow',p);
   document.querySelectorAll('details.sec').forEach(d=>{const [a,b]=per[+d.dataset.s];d.querySelector('.cnt').textContent=a+'/'+b;d.querySelector('.mini i').style.width=(a/b*100)+'%'});
   const wk=(target()-Date.now())/6048e5,left=total-c;
   $('pace').textContent=left===0?'Done':wk<=0?'--':(left/wk).toFixed(1);
@@ -282,7 +296,7 @@ function tick(){
   const d=target()-Date.now();
   if(d<0){$('d').textContent='0';$('clock').textContent='Exam day or later';return}$('d').textContent=Math.floor(d/864e5);
   const h=Math.floor(d%864e5/36e5),m=Math.floor(d%36e5/6e4),s=Math.floor(d%6e4/1e3);
-  $('clock').textContent=`${h}h ${m}s ${s}s`;
+  $('clock').textContent=`${h}h ${m}m ${s}s`;
 }
 $('date').value=get(DK)||'2027-02-06';
 $('date').addEventListener('change',()=>{set(DK,$('date').value);tick();update()});
@@ -292,7 +306,7 @@ $('next').onclick=()=>{
   const r=[...document.querySelectorAll('.t')].find(x=>!x.classList.contains('done'));
   if(!r)return;
   const d=r.closest('details');d.open=true;
-  r.scrollIntoView({behavior:'smooth',block:'center'});
+  r.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'});
   r.querySelector('input').focus({preventScroll:true});
 };
 let dp=null;
@@ -308,3 +322,9 @@ update();tick();setInterval(tick,1000);
 </script>
 </body>
 </html>
+
+
+
+
+
+
