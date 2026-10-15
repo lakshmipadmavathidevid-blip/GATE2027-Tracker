@@ -301,7 +301,7 @@ function update(){
 function tick(){
   const d=target()-Date.now();
   if(d<0){$('d').textContent='0';$('clock').textContent='Exam day or later';return}$('d').textContent=Math.floor(d/864e5);
-  const h=Math.floor(d%864e5/36e5),mc=Math.floor(d%36e5/6e4),s=Math.floor(d%6e4/1e3);
+  const h=Math.floor(d%864e5/36e5),m=Math.floor(d%36e5/6e4),s=Math.floor(d%6e4/1e3);
   $('clock').textContent=`${h}h ${m}m ${s}s`;
 }
 $('date').value=get(DK)||'2027-02-06';
